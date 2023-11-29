@@ -1,11 +1,10 @@
 use std::{
-    fs::File,
+    fs::{self, File},
     io::{self, BufReader, BufWriter, Write},
 };
 
 use chrono::NaiveDate;
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_json::to_writer;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Assignment {
@@ -50,10 +49,16 @@ impl<'de> Deserialize<'de> for AssignmentInfo {
 
         let raw_info = RawAssignmentInfo::deserialize(deserializer)?;
 
-        let due_at = NaiveDate::parse_from_str(&raw_info.due_at, "%Y-%m-%dT%H:%M:%SZ")
-            .map_err(serde::de::Error::custom)?;
+        if let Ok(due_at) = NaiveDate::parse_from_str(&raw_info.due_at, "%Y-%m-%dT%H:%M:%SZ") {
+            return Ok(AssignmentInfo { due_at });
+        } else if let Ok(due_at) = NaiveDate::parse_from_str(&raw_info.due_at, "%Y-%m-%d") {
+            return Ok(AssignmentInfo { due_at });
+        }
+        // let due_at = NaiveDate::parse_from_str(&raw_info.due_at, "%Y-%m-%dT%H:%M:%SZ")
+        // .map_err(serde::de::Error::custom)?;
 
-        Ok(AssignmentInfo { due_at })
+        // Ok(AssignmentInfo { due_at })
+        return Err(serde::de::Error::custom("Invalid date format"));
     }
 }
 
@@ -91,29 +96,25 @@ fn access_json() -> Result<Vec<Assignment>, Box<dyn std::error::Error>> {
     let file = File::open("canvas_assignment_data.json")?;
     let reader = BufReader::new(file);
     let a: Vec<Assignment> = serde_json::from_reader(reader)?;
-    if a.get(0)
-        .expect("JSON file isn't empty")
-        .info
-        .as_ref()
-        .unwrap()
-        .due_at
-        .ne(&chrono::Local::now().date_naive())
-    {
+    let oldest_date = a.first_date();
+    let current_date = chrono::Local::now().date_naive();
+    if oldest_date.lt(&current_date) {
         return Err(Box::new(JSONOldError));
     }
     Ok(a)
 }
 
 pub async fn get_assignments(access_token: String) -> Result<Vec<Assignment>, reqwest::Error> {
-    // if let Ok(a) = access_json() {
-    //     return Ok(a);
-    // }
-    // let assignments = fetch_assignments(access_token).await?;
-    // let file = File::create("canvas_assignment_data.json").expect("Unable to write JSON file");
-    // let mut writer = BufWriter::new(file);
-    // serde_json::to_writer(&mut writer, &assignments).expect("Unable to to write JSON file");
-    // writer.flush().expect("Unable to write JSON file");
-    let assignments = access_json().unwrap();
-    println!("{:?}", assignments);
+    if let Ok(a) = access_json() {
+        return Ok(a);
+    }
+    let assignments = fetch_assignments(access_token).await?;
+    let file = File::create("canvas_assignment_data.json").expect("Unable to write JSON file");
+    let mut writer = BufWriter::new(file);
+    serde_json::to_writer_pretty(&mut writer, &assignments).unwrap();
+    writer.flush().expect("Unable to write JSON file");
+    // let assignments = access_json().unwrap();
+    // println!("{:?}", assignments);
     Ok(assignments)
+    // Ok(())
 }
