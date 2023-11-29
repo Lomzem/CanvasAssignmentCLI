@@ -1,5 +1,11 @@
+use std::{
+    fs::File,
+    io::{self, BufReader, BufWriter, Write},
+};
+
 use chrono::NaiveDate;
 use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::to_writer;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Assignment {
@@ -51,7 +57,16 @@ impl<'de> Deserialize<'de> for AssignmentInfo {
     }
 }
 
-pub async fn get_assignments(access_token: String) -> Result<Vec<Assignment>, reqwest::Error> {
+#[derive(Debug)]
+struct JSONOldError;
+impl std::error::Error for JSONOldError {}
+impl std::fmt::Display for JSONOldError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "JSON file is too old")
+    }
+}
+
+async fn fetch_assignments(access_token: String) -> Result<Vec<Assignment>, reqwest::Error> {
     let api_endpoint: String = format!(
         "https://canvas.butte.edu/api/v1/users/self/upcoming_events?access_token={}",
         access_token
@@ -70,4 +85,35 @@ pub async fn get_assignments(access_token: String) -> Result<Vec<Assignment>, re
         .collect();
 
     Ok(valid)
+}
+
+fn access_json() -> Result<Vec<Assignment>, Box<dyn std::error::Error>> {
+    let file = File::open("canvas_assignment_data.json")?;
+    let reader = BufReader::new(file);
+    let a: Vec<Assignment> = serde_json::from_reader(reader)?;
+    if a.get(0)
+        .expect("JSON file isn't empty")
+        .info
+        .as_ref()
+        .unwrap()
+        .due_at
+        .ne(&chrono::Local::now().date_naive())
+    {
+        return Err(Box::new(JSONOldError));
+    }
+    Ok(a)
+}
+
+pub async fn get_assignments(access_token: String) -> Result<Vec<Assignment>, reqwest::Error> {
+    // if let Ok(a) = access_json() {
+    //     return Ok(a);
+    // }
+    // let assignments = fetch_assignments(access_token).await?;
+    // let file = File::create("canvas_assignment_data.json").expect("Unable to write JSON file");
+    // let mut writer = BufWriter::new(file);
+    // serde_json::to_writer(&mut writer, &assignments).expect("Unable to to write JSON file");
+    // writer.flush().expect("Unable to write JSON file");
+    let assignments = access_json().unwrap();
+    println!("{:?}", assignments);
+    Ok(assignments)
 }
