@@ -1,7 +1,5 @@
-use std::{
-    fs::{self, File},
-    io::{self, BufReader, BufWriter, Write},
-};
+use std::fs::File;
+use std::io::{BufReader, BufWriter, Write};
 
 use chrono::NaiveDate;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -22,18 +20,19 @@ pub struct AssignmentInfo {
     pub due_at: NaiveDate,
 }
 
-pub trait AssignmentManipulation {
-    fn first_date(&self) -> NaiveDate;
+pub trait FirstDate {
+    fn first_date(&self) -> &NaiveDate;
 }
 
-impl AssignmentManipulation for Vec<Assignment> {
-    fn first_date(&self) -> NaiveDate {
-        self.get(0)
+impl FirstDate for Vec<Assignment> {
+    fn first_date(&self) -> &NaiveDate {
+        return &self
+            .get(0)
             .expect("Response isn't empty")
             .info
             .as_ref()
             .unwrap()
-            .due_at
+            .due_at;
     }
 }
 
@@ -54,10 +53,7 @@ impl<'de> Deserialize<'de> for AssignmentInfo {
         } else if let Ok(due_at) = NaiveDate::parse_from_str(&raw_info.due_at, "%Y-%m-%d") {
             return Ok(AssignmentInfo { due_at });
         }
-        // let due_at = NaiveDate::parse_from_str(&raw_info.due_at, "%Y-%m-%dT%H:%M:%SZ")
-        // .map_err(serde::de::Error::custom)?;
 
-        // Ok(AssignmentInfo { due_at })
         return Err(serde::de::Error::custom("Invalid date format"));
     }
 }
@@ -84,37 +80,38 @@ async fn fetch_assignments(access_token: String) -> Result<Vec<Assignment>, reqw
         .json()
         .await?;
 
-    let valid: Vec<Assignment> = api_response
+    return Ok(api_response
         .into_iter()
         .filter(|assignment| assignment.to_owned().info.is_some())
-        .collect();
-
-    Ok(valid)
+        .collect());
 }
 
 fn access_json() -> Result<Vec<Assignment>, Box<dyn std::error::Error>> {
     let file = File::open("canvas_assignment_data.json")?;
     let reader = BufReader::new(file);
     let a: Vec<Assignment> = serde_json::from_reader(reader)?;
+
     let oldest_date = a.first_date();
     let current_date = chrono::Local::now().date_naive();
+
     if oldest_date.lt(&current_date) {
         return Err(Box::new(JSONOldError));
     }
-    Ok(a)
+
+    return Ok(a);
 }
 
 pub async fn get_assignments(access_token: String) -> Result<Vec<Assignment>, reqwest::Error> {
+    // return assignments early if a json already exists
     if let Ok(a) = access_json() {
         return Ok(a);
     }
+
     let assignments = fetch_assignments(access_token).await?;
     let file = File::create("canvas_assignment_data.json").expect("Unable to write JSON file");
     let mut writer = BufWriter::new(file);
     serde_json::to_writer_pretty(&mut writer, &assignments).unwrap();
     writer.flush().expect("Unable to write JSON file");
-    // let assignments = access_json().unwrap();
-    // println!("{:?}", assignments);
-    Ok(assignments)
-    // Ok(())
+
+    return Ok(assignments);
 }
