@@ -11,7 +11,6 @@ use std::io;
 
 pub struct Menu {
     assignments: Vec<Assignment>,
-    // selection: usize,
 }
 
 impl Menu {
@@ -64,7 +63,6 @@ impl Menu {
                     execute!(
                         stdout,
                         cursor::MoveTo(0, (index + 1) as u16),
-                        // Print(format!("{} <--", &elem.title))
                         Print(format!("{} - {} <--", &course, &elem.title))
                     )
                     .unwrap();
