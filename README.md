@@ -11,4 +11,10 @@ The tool is designed specifically for me personally, but it's also possible to r
 into your .bashrc file)
 
 ## Controls
-I based the controls on vim bindings as a neovim user. Here are the current supported keybinds:
+TODO! List controls
+Just use j, k, l, h, o
+<!-- I based the controls on vim bindings as a neovim user. Here are the current supported keybinds: -->
+
+## Future Wanted Features
+- Make browser open feature more extensible
+- Skip days that have no assignments
