@@ -126,12 +126,10 @@ impl Menu {
                         cursor::MoveTo(0, 0)
                     )
                     .unwrap();
-                    std::process::Command::new(
-                        "/mnt/c/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe",
-                    )
-                    .arg(&filtered_assignments.get(selection).unwrap().url)
-                    .spawn()
-                    .unwrap();
+                    std::process::Command::new("brave.exe")
+                        .arg(&filtered_assignments.get(selection).unwrap().url)
+                        .spawn()
+                        .unwrap();
                     break;
                 }
                 _ => {}
