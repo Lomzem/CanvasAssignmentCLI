@@ -1,5 +1,6 @@
 use chrono::{Datelike, Duration, Local, NaiveDate};
 use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::terminal::disable_raw_mode;
 use crossterm::{
     cursor,
     style::Print,
@@ -15,17 +16,29 @@ pub struct Menu {
 
 impl Menu {
     pub fn new(assignments: Vec<Assignment>) -> Self {
-        return Self { assignments };
+        Self { assignments }
+    }
+
+    pub fn quit(&self) -> Result<(), std::io::Error> {
+        let result = execute!(
+            io::stdout(),
+            crossterm::terminal::LeaveAlternateScreen,
+            Clear(ClearType::All),
+            cursor::Show,
+            cursor::MoveTo(0, 0),
+        );
+        disable_raw_mode()?;
+        result?;
+        Ok(())
     }
 
     fn assignments_on_date(&self, due_date: &NaiveDate) -> Vec<&Assignment> {
         // Returns a vec of assignments that only are due on
         // due_date from the Menu struct's "assignments" field
-        return self
-            .assignments
+        self.assignments
             .iter()
             .filter(|a| a.info.as_ref().unwrap().due_at.eq(due_date))
-            .collect();
+            .collect()
     }
 
     pub fn show_menu(&self) {
@@ -81,13 +94,7 @@ impl Menu {
                     code: KeyCode::Char('q'),
                     ..
                 }) => {
-                    execute!(
-                        io::stdout(),
-                        Clear(ClearType::All),
-                        cursor::Show,
-                        cursor::MoveTo(0, 0)
-                    )
-                    .unwrap();
+                    self.quit().unwrap();
                     break;
                 }
 
@@ -119,13 +126,7 @@ impl Menu {
                     code: KeyCode::Char('o'),
                     ..
                 }) => {
-                    execute!(
-                        io::stdout(),
-                        Clear(ClearType::All),
-                        cursor::Show,
-                        cursor::MoveTo(0, 0)
-                    )
-                    .unwrap();
+                    self.quit().unwrap();
                     std::process::Command::new("brave.exe")
                         .arg(&filtered_assignments.get(selection).unwrap().url)
                         .spawn()
