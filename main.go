@@ -8,6 +8,10 @@ import (
 	"os"
 )
 
+type Canvas struct {
+	accessKey string
+}
+
 type Course struct {
 	name string
 	id   int
@@ -34,7 +38,12 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		bytes, _ := io.ReadAll(jsonFile)
+
+		bytes, err := io.ReadAll(jsonFile)
+		if err != nil {
+			panic(err)
+		}
+
 		json.Unmarshal(bytes, &assList)
 	}
 }

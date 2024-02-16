@@ -11,10 +11,6 @@ import (
 	"time"
 )
 
-type Canvas struct {
-	accessKey string
-}
-
 type AssignmentList []Assignment
 
 type Assignment struct {
