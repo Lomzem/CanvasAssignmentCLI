@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 )
 
@@ -26,13 +27,13 @@ func (c Canvas) courseEndpoint(courseId string) (string, string) {
 	baseUrl, err := url.Parse("https://canvas.butte.edu/")
 
 	if err != nil {
-		_ = fmt.Errorf("Something's wrong with canvas url")
+		panic("Something's wrong with canvas url")
 	}
 
 	epUrl, err := baseUrl.Parse(endpoint)
 
 	if err != nil {
-		_ = fmt.Errorf("Something's wrong with endpoint received or the course id")
+		panic("Something's wrong with endpoint received or the course id")
 	}
 
 	params := epUrl.Query()
@@ -51,8 +52,10 @@ func (c Canvas) courseEndpoint(courseId string) (string, string) {
 	return upcoming, future
 }
 
-func (c Canvas) parseAssignments(endpoint string) AssignmentList {
-	resp, err := http.Get(endpoint)
+func (c Canvas) parseAssignments(endpoint *string, ch chan<- AssignmentList, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	resp, err := http.Get(*endpoint)
 	if err != nil {
 		panic(err)
 	}
@@ -65,12 +68,30 @@ func (c Canvas) parseAssignments(endpoint string) AssignmentList {
 
 	var assList AssignmentList
 	json.Unmarshal(body, &assList)
-	return assList
+	ch <- assList
 }
 
 func (c Canvas) CourseAssignments(courseId string) {
-	upcoming, _ := c.courseEndpoint(courseId)
-	assList := c.parseAssignments(upcoming)
+	upcoming, future := c.courseEndpoint(courseId)
+
+	ch := make(chan AssignmentList)
+	var wg sync.WaitGroup
+	var assList AssignmentList
+
+	wg.Add(1)
+	go c.parseAssignments(&upcoming, ch, &wg)
+
+	wg.Add(1)
+	go c.parseAssignments(&future, ch, &wg)
+
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
+	for result := range ch {
+		assList = append(assList, result...)
+	}
 
 	fmt.Println(assList)
 
