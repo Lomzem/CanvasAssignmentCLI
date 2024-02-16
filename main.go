@@ -1,27 +1,40 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"os"
 )
+
+type Course struct {
+	name string
+	id   int
+}
 
 func main() {
 	access_key := os.Getenv("CANVAS_ACCESS_KEY")
 	canvas := Canvas{accessKey: access_key}
-	canvas.CourseAssignments("33973")
+	courses := []Course{
+		{"Physics", 33973},
+		{"Discrete Structures", 33161},
+		{"Architecture and Organization", 33114},
+		{"Programming and Algorithms", 33148},
+	}
 
-	// fmt.Println(courseEndpoint)
-	//
-	// resp, err := http.Get(courseEndpoint)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	//
-	// defer resp.Body.Close()
-	// body, err := io.ReadAll(resp.Body)
-	// if err != nil {
-	// 	panic(err)
-	// }
+	var assList AssignmentList
 
-	// fmt.Println(body)
-	// os.WriteFile("./course.json", body, 0644)
+	if _, err := os.Stat("assignments.json"); errors.Is(err, os.ErrNotExist) {
+		assList = canvas.SaveCourseAssignments(&courses)
+		fmt.Println("did call")
+	} else {
+		jsonFile, err := os.Open("assignments.json")
+		defer jsonFile.Close()
+		if err != nil {
+			panic(err)
+		}
+		bytes, _ := io.ReadAll(jsonFile)
+		json.Unmarshal(bytes, &assList)
+	}
 }

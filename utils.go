@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"sync"
 	"time"
 )
@@ -17,13 +18,15 @@ type Canvas struct {
 type AssignmentList []Assignment
 
 type Assignment struct {
-	Name string `json:"name"`
-	// Description string    `json:"description"`
-	DueAt time.Time `json:"due_at"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	DueAt       time.Time `json:"due_at"`
+	CourseId    int       `json:"course_id"`
+	Url         string    `json:"html_url"`
 }
 
-func (c Canvas) courseEndpoint(courseId string) (string, string) {
-	endpoint := fmt.Sprintf("/api/v1/courses/%s/assignments", courseId)
+func (c Canvas) courseEndpoint(courseId int) (string, string) {
+	endpoint := fmt.Sprintf("/api/v1/courses/%d/assignments", courseId)
 	baseUrl, err := url.Parse("https://canvas.butte.edu/")
 
 	if err != nil {
@@ -71,18 +74,20 @@ func (c Canvas) parseAssignments(endpoint *string, ch chan<- AssignmentList, wg 
 	ch <- assList
 }
 
-func (c Canvas) CourseAssignments(courseId string) {
-	upcoming, future := c.courseEndpoint(courseId)
-
+func (c Canvas) SaveCourseAssignments(courseIds *[]Course) AssignmentList {
 	ch := make(chan AssignmentList)
 	var wg sync.WaitGroup
 	var assList AssignmentList
 
-	wg.Add(1)
-	go c.parseAssignments(&upcoming, ch, &wg)
+	for _, courseId := range *courseIds {
+		upcoming, future := c.courseEndpoint(courseId.id)
 
-	wg.Add(1)
-	go c.parseAssignments(&future, ch, &wg)
+		wg.Add(1)
+		go c.parseAssignments(&upcoming, ch, &wg)
+
+		wg.Add(1)
+		go c.parseAssignments(&future, ch, &wg)
+	}
 
 	go func() {
 		wg.Wait()
@@ -93,6 +98,7 @@ func (c Canvas) CourseAssignments(courseId string) {
 		assList = append(assList, result...)
 	}
 
-	fmt.Println(assList)
-
+	pretty, _ := json.Marshal(assList)
+	os.WriteFile("assignments.json", pretty, 0644)
+	return assList
 }
